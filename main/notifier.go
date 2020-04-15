@@ -1,4 +1,4 @@
-package notifier
+package main
 
 import (
 	"bytes"
@@ -14,12 +14,11 @@ import (
 func main() {
 	url := "http://localhost:8082"
 	fmt.Println("URL:>", url)
-	// keepAliveTimeout:= 600 * time.Second
 	timeout := 1 * time.Second
 
 	tr := &http.Transport{
-		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: 100,
+		MaxIdleConns:        1024,
+		MaxIdleConnsPerHost: 1024,
 		TLSHandshakeTimeout: 0 * time.Second,
 	}
 	client := &http.Client{
@@ -45,7 +44,6 @@ func makeRequest(url string, client *http.Client, counter int64) {
 	var now = strconv.FormatInt(int64(time.Now().Unix()), 10)
 
 	var jsonStr = []byte(` {"text": "hello world", "content_id": ` + x + `, "client_id": ` + y + `, "timestamp": ` + now + `}`)
-	fmt.Println(counter)
 	var jsonBytes = bytes.NewReader(jsonStr)
 	stringReadCloser := ioutil.NopCloser(jsonBytes)
 	defer stringReadCloser.Close()
@@ -67,10 +65,7 @@ func makeRequest(url string, client *http.Client, counter int64) {
 		defer resp.Body.Close()
 
 		if resp != nil {
-			fmt.Println("response Status:", resp.Status)
-			fmt.Println("response Headers:", resp.Header)
-			body, _ := ioutil.ReadAll(resp.Body)
-			fmt.Println("response Body:", string(body))
+			_, _ = ioutil.ReadAll(resp.Body)
 			return
 		}
 

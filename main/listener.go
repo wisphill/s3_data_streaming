@@ -1,10 +1,8 @@
-package listener
+package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/joho/godotenv"
 	"github.com/minio/minio-go/v6"
 	"log"
@@ -20,6 +18,13 @@ type Data struct {
 	ClientId  int    `json:"client_id"`
 	Timestamp int    `json:"timestamp"`
 }
+
+type ClientData struct {
+	bytesData *bytes.Buffer
+	Count     int
+}
+
+var m map[int]*ClientData = make(map[int]*ClientData)
 
 func main() {
 	err := godotenv.Load()
@@ -44,9 +49,8 @@ func main() {
 		ctx.SetStatusCode(fasthttp.StatusOK)
 
 		var value = ctx.PostBody()
-		s := string(value[:len(value)])
+		//s := string(value[:len(value)])
 
-		fmt.Println(s)
 		in := value[:len(value)]
 		var data *Data
 		_err := json.Unmarshal(in, &data)
@@ -70,21 +74,34 @@ func main() {
 }
 
 func putFile(bucketName string, s3Client *minio.Client, data *Data, content []byte) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	/*ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
 	defer cancel()
-
-	obj := bytes.NewReader(content)
-	dateString := _convertTimestampToISO(int64(data.Timestamp))
-	fileName := "chat/" + dateString + "/content_logs_" + dateString + "_" + strconv.FormatInt(int64(data.ClientId), 10)
-	n, err := s3Client.PutObjectWithContext(ctx, bucketName, fileName,
-		obj, obj.Size(), minio.PutObjectOptions{
-			ContentType: "application/octet-stream",
-		})
-	if err != nil {
-		log.Println(err)
+	*/
+	if m[data.ClientId] == nil {
+		m[data.ClientId] = &ClientData{
+			bytesData: bytes.NewBuffer(content),
+			Count:     0,
+		}
+	} else {
+		m[data.ClientId].bytesData.Write(content)
+		m[data.ClientId].Count++
 	}
 
-	log.Println("Uploaded", fileName, " of size: ", n, "Successfully.")
+	if m[data.ClientId].Count%10000 == 0 {
+		obj := bytes.NewReader(m[data.ClientId].bytesData.Bytes())
+		dateString := _convertTimestampToISO(int64(data.Timestamp))
+		fileName := "chat/" + dateString + "/content_logs_" + dateString + "_" + strconv.FormatInt(int64(data.ClientId), 10)
+
+		n, err := s3Client.PutObject(bucketName, fileName,
+			obj, obj.Size(), minio.PutObjectOptions{
+				ContentType: "application/octet-stream",
+			})
+		if err != nil {
+			log.Println(err)
+		} else {
+			log.Println("Uploaded", fileName, " of size: ", n, "Successfully.")
+		}
+	}
 }
 
 func _convertTimestampToISO(value int64) string {
