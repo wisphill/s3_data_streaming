@@ -1,11 +1,12 @@
-package main
+package listener
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/minio/minio-go/v6"
 	"github.com/joho/godotenv"
+	"github.com/minio/minio-go/v6"
 	"log"
 	"os"
 	"strconv"
@@ -14,15 +15,13 @@ import (
 import "github.com/valyala/fasthttp"
 
 type Data struct {
-	Text string `json:"text"`
-	ContentId int `json:"content_id"`
-	ClientId int `json:"client_id"`
-	Timestamp int `json:"timestamp"`
+	Text      string `json:"text"`
+	ContentId int    `json:"content_id"`
+	ClientId  int    `json:"client_id"`
+	Timestamp int    `json:"timestamp"`
 }
 
 func main() {
-
-
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -40,7 +39,7 @@ func main() {
 		log.Fatalln(err_)
 	}
 
-	requestHandler := func(ctx *fasthttp.RequestCtx)  {
+	requestHandler := func(ctx *fasthttp.RequestCtx) {
 		// set some headers and status code first
 		ctx.SetStatusCode(fasthttp.StatusOK)
 
@@ -49,9 +48,9 @@ func main() {
 
 		fmt.Println(s)
 		in := value[:len(value)]
-		var data *Data;
+		var data *Data
 		_err := json.Unmarshal(in, &data)
-		if (_err != nil) {
+		if _err != nil {
 			panic(_err)
 		}
 
@@ -70,13 +69,16 @@ func main() {
 	fasthttp.ListenAndServe(":8082", requestHandler)
 }
 
-func putFile(bucketName string, s3Client *minio.Client, data *Data, content []byte)  {
+func putFile(bucketName string, s3Client *minio.Client, data *Data, content []byte) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	obj := bytes.NewReader(content)
-	fileName := "content_logs_" + _convertTimestampToISO(int64(data.Timestamp)) + strconv.FormatInt(int64(data.ClientId), 10)
-	n, err := s3Client.PutObject(bucketName, fileName,
+	dateString := _convertTimestampToISO(int64(data.Timestamp))
+	fileName := "chat/" + dateString + "/content_logs_" + dateString + "_" + strconv.FormatInt(int64(data.ClientId), 10)
+	n, err := s3Client.PutObjectWithContext(ctx, bucketName, fileName,
 		obj, obj.Size(), minio.PutObjectOptions{
 			ContentType: "application/octet-stream",
-			ContentEncoding: "gzip",
 		})
 	if err != nil {
 		log.Println(err)
@@ -85,7 +87,7 @@ func putFile(bucketName string, s3Client *minio.Client, data *Data, content []by
 	log.Println("Uploaded", fileName, " of size: ", n, "Successfully.")
 }
 
-func _convertTimestampToISO(value int64) string  {
+func _convertTimestampToISO(value int64) string {
 	i, err := strconv.ParseInt(strconv.Itoa(int(value)), 10, 64)
 	if err != nil {
 		panic(err)

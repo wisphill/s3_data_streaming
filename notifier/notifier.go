@@ -1,4 +1,4 @@
-package main
+package notifier
 
 import (
 	"bytes"
@@ -11,45 +11,44 @@ import (
 	"time"
 )
 
-func main()  {
+func main() {
 	url := "http://localhost:8082"
 	fmt.Println("URL:>", url)
 	// keepAliveTimeout:= 600 * time.Second
-	timeout:= 1 * time.Second
+	timeout := 1 * time.Second
 
 	tr := &http.Transport{
-		MaxIdleConns: 100,
+		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 100,
-			 TLSHandshakeTimeout: 0 * time.Second,
-		 }
+		TLSHandshakeTimeout: 0 * time.Second,
+	}
 	client := &http.Client{
 		Transport: tr,
-		Timeout: timeout,
+		Timeout:   timeout,
 	}
 
 	makeOneBillionReqs(url, client)
 }
 
-func makeOneBillionReqs(url string, client *http.Client)  {
-	for i := 0; i< 100000 ; i++  {
-		for j := 0; j< 10000 ; j++  {
-			makeRequest(url, client, int64(i * 10000 + j))
+func makeOneBillionReqs(url string, client *http.Client) {
+	for i := 0; i < 100000; i++ {
+		for j := 0; j < 10000; j++ {
+			makeRequest(url, client, int64(i*10000+j))
 		}
 	}
 }
 
-func makeRequest(url string, client *http.Client, counter int64)  {
+func makeRequest(url string, client *http.Client, counter int64) {
 	var randomNumber = rand.Intn(10)
 	var x = strconv.FormatInt(int64(counter), 10)
 	var y = strconv.FormatInt(int64(randomNumber), 10)
 	var now = strconv.FormatInt(int64(time.Now().Unix()), 10)
 
-	var jsonStr = []byte(` {"text": "hello world", "content_id": ` + x + `, "client_id": `+ y +`, "timestamp": `+ now +`}`)
+	var jsonStr = []byte(` {"text": "hello world", "content_id": ` + x + `, "client_id": ` + y + `, "timestamp": ` + now + `}`)
 	fmt.Println(counter)
 	var jsonBytes = bytes.NewReader(jsonStr)
 	stringReadCloser := ioutil.NopCloser(jsonBytes)
 	defer stringReadCloser.Close()
-
 
 	req, err := http.NewRequest("POST", url, jsonBytes)
 	if err != nil {
@@ -62,7 +61,7 @@ func makeRequest(url string, client *http.Client, counter int64)  {
 		resp, err := client.Do(req)
 		if err != nil {
 			fmt.Errorf("Error")
-			return;
+			return
 		}
 
 		defer resp.Body.Close()
@@ -72,7 +71,7 @@ func makeRequest(url string, client *http.Client, counter int64)  {
 			fmt.Println("response Headers:", resp.Header)
 			body, _ := ioutil.ReadAll(resp.Body)
 			fmt.Println("response Body:", string(body))
-			return;
+			return
 		}
 
 		_, err = io.Copy(ioutil.Discard, resp.Body) // make sure to read body
